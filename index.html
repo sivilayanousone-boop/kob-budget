@@ -6,81 +6,99 @@
     <meta name="theme-color" content="#2563eb">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="KobBudget">
-    <title>Kob's Budget Tracker</title>
+    <title>Kob's Budget</title>
     <link rel="manifest" href="/manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family:'Noto Sans Lao',sans-serif; overscroll-behavior-y:none; }
-        .spending-card { background:linear-gradient(135deg,#1e3a8a 0%,#3b82f6 100%); }
-        .tab-active   { background:#2563eb; color:white; box-shadow:0 4px 12px rgba(37,99,235,0.3); }
-        .tab-inactive { background:#f1f5f9; color:#64748b; }
-        .modal-enter  { animation:slideUp .28s cubic-bezier(.22,.68,0,1.2); }
-        @keyframes slideUp { from{transform:translateY(50px) scale(.97);opacity:0} to{transform:translateY(0) scale(1);opacity:1} }
-        @keyframes confetti { 0%{transform:translateY(0) rotate(0);opacity:1} 100%{transform:translateY(-90px) rotate(720deg);opacity:0} }
-        .confetti-piece { animation:confetti .9s ease-out forwards; position:absolute; width:8px; height:8px; border-radius:2px; }
-        .plan-card         { border-left:3px solid #3b82f6; }
-        .plan-card.warning { border-left-color:#f59e0b; }
-        .plan-card.danger  { border-left-color:#ef4444; }
-        .plan-card.success { border-left-color:#10b981; }
-        .filter-active { background:rgba(255,255,255,0.28) !important; border:1px solid rgba(255,255,255,0.5) !important; }
-        #toast { transition:opacity .3s; }
-        .shimmer { background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%); background-size:200%; animation:shimmer 1.4s infinite; }
-        @keyframes shimmer { 0%{background-position:200%} 100%{background-position:-200%} }
-        /* Install banner */
-        #installBanner { display:none; }
-        /* Safe area for notch phones */
-        header { padding-top: max(2rem, env(safe-area-inset-top)); }
-        .pb-safe { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); }
+        *{box-sizing:border-box;}
+        body{font-family:'Noto Sans Lao',sans-serif;overscroll-behavior-y:none;}
+        .spending-card{background:linear-gradient(135deg,#1e3a8a 0%,#3b82f6 100%);}
+        .tab-active{background:#2563eb;color:white;box-shadow:0 4px 12px rgba(37,99,235,0.3);}
+        .tab-inactive{background:#f1f5f9;color:#64748b;}
+        .modal-enter{animation:slideUp .28s cubic-bezier(.22,.68,0,1.2);}
+        @keyframes slideUp{from{transform:translateY(50px) scale(.97);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+        @keyframes confetti{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(-90px) rotate(720deg);opacity:0}}
+        .confetti-piece{animation:confetti .9s ease-out forwards;position:absolute;width:8px;height:8px;border-radius:2px;}
+        .plan-card{border-left:3px solid #3b82f6;}
+        .plan-card.warning{border-left-color:#f59e0b;}
+        .plan-card.danger{border-left-color:#ef4444;}
+        .plan-card.success{border-left-color:#10b981;}
+        .filter-active{background:rgba(255,255,255,0.28)!important;border:1px solid rgba(255,255,255,0.5)!important;}
+        #toast{transition:opacity .3s;}
+        .shimmer{background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);background-size:200%;animation:shimmer 1.4s infinite;}
+        @keyframes shimmer{0%{background-position:200%}100%{background-position:-200%}}
+        .pin-dot{width:16px;height:16px;border-radius:50%;background:#e2e8f0;transition:background .15s;}
+        .pin-dot.filled{background:#2563eb;}
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800">
 
 <div id="confettiContainer" class="fixed inset-0 pointer-events-none z-[100] overflow-hidden"></div>
+<div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-[200] bg-slate-800 text-white text-xs font-bold px-5 py-3 rounded-full shadow-xl opacity-0 pointer-events-none whitespace-nowrap"></div>
 
-<!-- Toast -->
-<div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-[200] bg-slate-800 text-white text-xs font-bold px-5 py-3 rounded-full shadow-xl opacity-0 pointer-events-none whitespace-nowrap">...</div>
+<!-- ═══ PIN SCREEN ═══ -->
+<div id="pinScreen" class="fixed inset-0 bg-gradient-to-br from-blue-700 to-blue-900 flex flex-col items-center justify-center z-[300] p-8">
+    <div class="text-6xl mb-4">💰</div>
+    <h1 class="text-white text-2xl font-bold mb-1">Kob's Budget</h1>
+    <p id="pinLabel" class="text-blue-200 text-sm mb-10">ໃສ່ PIN 4 ຕົວ</p>
 
-<!-- Install Banner -->
-<div id="installBanner" class="fixed bottom-24 left-4 right-4 z-[150] bg-blue-600 text-white rounded-2xl p-4 shadow-2xl flex items-center gap-3">
-    <span class="text-2xl">📲</span>
-    <div class="flex-1">
-        <p class="font-bold text-sm">ຕິດຕັ້ງເປັນ App!</p>
-        <p class="text-[10px] opacity-80">ໃຊ້ງານໄດ້ຄືກັບ app ຈິງໆ</p>
+    <!-- PIN dots -->
+    <div class="flex gap-4 mb-10">
+        <div id="dot0" class="pin-dot"></div>
+        <div id="dot1" class="pin-dot"></div>
+        <div id="dot2" class="pin-dot"></div>
+        <div id="dot3" class="pin-dot"></div>
     </div>
-    <button onclick="installApp()" class="bg-white text-blue-600 font-bold text-xs px-4 py-2 rounded-xl">ຕິດຕັ້ງ</button>
-    <button onclick="dismissInstall()" class="opacity-60 text-lg leading-none ml-1">×</button>
+
+    <!-- Numpad -->
+    <div class="grid grid-cols-3 gap-4 w-72">
+        <button onclick="pinPress(1)" class="h-16 bg-white/15 hover:bg-white/25 active:scale-90 text-white text-2xl font-bold rounded-2xl transition-all">1</button>
+        <button onclick="pinPress(2)" class="h-16 bg-white/15 hover:bg-white/25 active:scale-90 text-white text-2xl font-bold rounded-2xl transition-all">2</button>
+        <button onclick="pinPress(3)" class="h-16 bg-white/15 hover:bg-white/25 active:scale-90 text-white text-2xl font-bold rounded-2xl transition-all">3</button>
+        <button onclick="pinPress(4)" class="h-16 bg-white/15 hover:bg-white/25 active:scale-90 text-white text-2xl font-bold rounded-2xl transition-all">4</button>
+        <button onclick="pinPress(5)" class="h-16 bg-white/15 hover:bg-white/25 active:scale-90 text-white text-2xl font-bold rounded-2xl transition-all">5</button>
+        <button onclick="pinPress(6)" class="h-16 bg-white/15 hover:bg-white/25 active:scale-90 text-white text-2xl font-bold rounded-2xl transition-all">6</button>
+        <button onclick="pinPress(7)" class="h-16 bg-white/15 hover:bg-white/25 active:scale-90 text-white text-2xl font-bold rounded-2xl transition-all">7</button>
+        <button onclick="pinPress(8)" class="h-16 bg-white/15 hover:bg-white/25 active:scale-90 text-white text-2xl font-bold rounded-2xl transition-all">8</button>
+        <button onclick="pinPress(9)" class="h-16 bg-white/15 hover:bg-white/25 active:scale-90 text-white text-2xl font-bold rounded-2xl transition-all">9</button>
+        <button onclick="pinClear()" class="h-16 bg-white/10 active:scale-90 text-white text-sm font-bold rounded-2xl transition-all">ລຶບ</button>
+        <button onclick="pinPress(0)" class="h-16 bg-white/15 hover:bg-white/25 active:scale-90 text-white text-2xl font-bold rounded-2xl transition-all">0</button>
+        <button onclick="pinBackspace()" class="h-16 bg-white/10 active:scale-90 text-white text-2xl font-bold rounded-2xl transition-all">⌫</button>
+    </div>
+    <p id="pinError" class="text-rose-300 text-sm mt-6 opacity-0">PIN ບໍ່ຖືກຕ້ອງ ລອງໃໝ່</p>
 </div>
 
+<!-- ═══ MAIN APP ═══ -->
+<div id="mainApp" class="hidden">
+
 <!-- Header -->
-<header class="spending-card text-white px-8 pb-8 rounded-b-[3rem] shadow-2xl relative overflow-hidden">
+<header class="spending-card text-white px-6 pt-10 pb-6 rounded-b-[3rem] shadow-2xl relative overflow-hidden">
     <div class="relative z-10 flex justify-between items-start">
         <div>
             <h1 class="text-xs font-medium opacity-70 uppercase tracking-widest">ຍອດເງິນທີ່ໃຊ້ໄດ້</h1>
             <h2 id="spendingBalance" class="text-5xl font-bold mt-1 tracking-tighter">0 ກີບ</h2>
             <div class="mt-3 flex items-center gap-3">
                 <div class="flex items-center gap-1.5 text-xs bg-white/10 px-3 py-1.5 rounded-full">
-                    <span class="opacity-70">ຮັບ:</span>
-                    <span id="totalIncome" class="font-bold text-emerald-300">0</span>
+                    <span class="opacity-70">ຮັບ:</span><span id="totalIncome" class="font-bold text-emerald-300">0</span>
                 </div>
                 <div class="flex items-center gap-1.5 text-xs bg-white/10 px-3 py-1.5 rounded-full">
-                    <span class="opacity-70">ຈ່າຍ:</span>
-                    <span id="totalExpense" class="font-bold text-rose-300">0</span>
+                    <span class="opacity-70">ຈ່າຍ:</span><span id="totalExpense" class="font-bold text-rose-300">0</span>
                 </div>
             </div>
         </div>
-        <button onclick="openSummaryModal()" class="bg-white/20 hover:bg-white/30 p-3.5 rounded-2xl transition-all active:scale-90">
-            <span class="text-2xl">📊</span>
-        </button>
+        <div class="flex flex-col gap-2 items-end">
+            <button onclick="openSummaryModal()" class="bg-white/20 hover:bg-white/30 p-3 rounded-2xl transition-all active:scale-90"><span class="text-xl">📊</span></button>
+            <button onclick="lockApp()" class="bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl transition-all text-[10px] font-bold opacity-70">🔒 ອອກ</button>
+        </div>
     </div>
     <div class="mt-4 flex gap-2">
-        <button onclick="setFilter('week')"  id="f-week"  class="flex-1 text-[10px] font-bold py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition uppercase tracking-wider border border-transparent">ອາທິດນີ້</button>
-        <button onclick="setFilter('month')" id="f-month" class="flex-1 text-[10px] font-bold py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition uppercase tracking-wider border border-transparent">ເດືອນນີ້</button>
-        <button onclick="setFilter('all')"   id="f-all"   class="flex-1 text-[10px] font-bold py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition uppercase tracking-wider border border-transparent">ທັງໝົດ</button>
+        <button onclick="setFilter('week')"  id="f-week"  class="flex-1 text-[10px] font-bold py-1.5 rounded-full bg-white/10 transition uppercase tracking-wider border border-transparent">ອາທິດ</button>
+        <button onclick="setFilter('month')" id="f-month" class="flex-1 text-[10px] font-bold py-1.5 rounded-full bg-white/10 transition uppercase tracking-wider border border-transparent">ເດືອນ</button>
+        <button onclick="setFilter('all')"   id="f-all"   class="flex-1 text-[10px] font-bold py-1.5 rounded-full bg-white/10 transition uppercase tracking-wider border border-transparent">ທັງໝົດ</button>
     </div>
     <div class="absolute -right-10 -bottom-10 w-44 h-44 bg-white opacity-10 rounded-full blur-2xl"></div>
 </header>
@@ -89,20 +107,15 @@
 <div class="max-w-md mx-auto px-4 mt-4">
     <div class="flex gap-2 bg-slate-100 p-1.5 rounded-2xl">
         <button onclick="switchTab('budget')" id="tab-budget" class="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all tab-active">💰 ງົບ</button>
+        <button onclick="switchTab('goals')"  id="tab-goals"  class="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all tab-inactive">🎯 ເປົ້າ</button>
         <button onclick="switchTab('ai')"     id="tab-ai"     class="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all tab-inactive">✨ AI</button>
-        <button onclick="switchTab('split')"  id="tab-split"  class="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all tab-inactive">🤝 ແບ່ງບິນ</button>
+        <button onclick="switchTab('split')"  id="tab-split"  class="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all tab-inactive">🤝 ແບ່ງ</button>
     </div>
 </div>
 
 <!-- BUDGET TAB -->
-<div id="page-budget" class="max-w-md mx-auto p-4 space-y-5 pb-28">
-    <div>
-        <h3 class="font-bold text-slate-500 ml-1 mb-3 text-[10px] uppercase tracking-widest">🎯 ເປົ້າໝາຍທ້ອນ</h3>
-        <div id="goalList" class="space-y-3"></div>
-    </div>
-    <button onclick="exportCSV()" class="w-full flex items-center justify-center gap-2 text-xs text-slate-500 bg-white border border-slate-100 py-3 rounded-2xl hover:border-blue-200 hover:text-blue-600 transition shadow-sm font-bold">
-        📥 ດາວໂຫຼດ CSV
-    </button>
+<div id="page-budget" class="max-w-md mx-auto p-4 space-y-4 pb-28">
+    <button onclick="exportCSV()" class="w-full flex items-center justify-center gap-2 text-xs text-slate-500 bg-white border border-slate-100 py-3 rounded-2xl hover:border-blue-200 hover:text-blue-600 transition shadow-sm font-bold">📥 ດາວໂຫຼດ CSV</button>
     <div>
         <h3 class="font-bold text-slate-500 ml-1 mb-3 text-[10px] uppercase tracking-widest flex justify-between">
             <span>🕒 ປະຫວັດລາຍການ</span>
@@ -118,36 +131,34 @@
     </div>
 </div>
 
+<!-- GOALS TAB -->
+<div id="page-goals" class="max-w-md mx-auto p-4 space-y-4 pb-28 hidden">
+    <button onclick="openGoalModal()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-blue-200 hover:bg-blue-700 transition active:scale-95 flex items-center justify-center gap-2">
+        <span class="text-xl">+</span> ສ້າງເປົ້າໝາຍໃໝ່
+    </button>
+    <div id="goalList" class="space-y-3"></div>
+    <p id="emptyGoals" class="text-center text-slate-300 text-sm py-10 hidden">ຍັງບໍ່ມີເປົ້າໝາຍ — ສ້າງເລີຍ!</p>
+</div>
+
 <!-- AI TAB -->
 <div id="page-ai" class="max-w-md mx-auto p-4 space-y-4 pb-28 hidden">
     <div class="grid grid-cols-2 gap-3">
         <button onclick="runAI('summary')" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 text-left hover:border-blue-200 active:scale-95 transition">
-            <div class="text-2xl mb-2">📊</div>
-            <p class="font-bold text-sm text-slate-700">ສະຫຼຸບລາຍຈ່າຍ</p>
-            <p class="text-[10px] text-slate-400 mt-0.5">ແຍກຕາມໝວດໝູ່</p>
+            <div class="text-2xl mb-2">📊</div><p class="font-bold text-sm text-slate-700">ສະຫຼຸບລາຍຈ່າຍ</p><p class="text-[10px] text-slate-400 mt-0.5">ແຍກຕາມໝວດໝູ່</p>
         </button>
         <button onclick="runAI('warning')" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 text-left hover:border-amber-200 active:scale-95 transition">
-            <div class="text-2xl mb-2">⚠️</div>
-            <p class="font-bold text-sm text-slate-700">ສັນຍານເຕືອນ</p>
-            <p class="text-[10px] text-slate-400 mt-0.5">ໃຊ້ຈ່າຍເກີນບໍ?</p>
+            <div class="text-2xl mb-2">⚠️</div><p class="font-bold text-sm text-slate-700">ສັນຍານເຕືອນ</p><p class="text-[10px] text-slate-400 mt-0.5">ໃຊ້ຈ່າຍເກີນບໍ?</p>
         </button>
         <button onclick="runAI('goal')" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 text-left hover:border-purple-200 active:scale-95 transition">
-            <div class="text-2xl mb-2">🎯</div>
-            <p class="font-bold text-sm text-slate-700">ທຳນາຍເປົ້າໝາຍ</p>
-            <p class="text-[10px] text-slate-400 mt-0.5">ຈະບັນລຸໃນກີ່ເດືອນ?</p>
+            <div class="text-2xl mb-2">🎯</div><p class="font-bold text-sm text-slate-700">ທຳນາຍເປົ້າໝາຍ</p><p class="text-[10px] text-slate-400 mt-0.5">ຈະບັນລຸໃນກີ່ເດືອນ?</p>
         </button>
         <button onclick="runAI('timing')" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 text-left hover:border-teal-200 active:scale-95 transition">
-            <div class="text-2xl mb-2">📅</div>
-            <p class="font-bold text-sm text-slate-700">ເວລາທີ່ດີ</p>
-            <p class="text-[10px] text-slate-400 mt-0.5">ຄວນປະຢັດຕອນໃດ?</p>
+            <div class="text-2xl mb-2">📅</div><p class="font-bold text-sm text-slate-700">ເວລາທີ່ດີ</p><p class="text-[10px] text-slate-400 mt-0.5">ຄວນປະຢັດຕອນໃດ?</p>
         </button>
     </div>
     <div class="bg-white rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
         <div class="p-4 flex justify-between items-center border-b border-slate-50">
-            <div>
-                <p class="font-bold text-slate-700 text-sm">📝 ແຜນການໃຊ້ຈ່າຍເດືອນໜ້າ</p>
-                <p class="text-[10px] text-slate-400 mt-0.5">AI ແນະນຳໂດຍອີງໃສ່ປະຫວັດ</p>
-            </div>
+            <div><p class="font-bold text-slate-700 text-sm">📝 ແຜນການໃຊ້ຈ່າຍເດືອນໜ້າ</p><p class="text-[10px] text-slate-400 mt-0.5">AI ແນະນຳໂດຍອີງໃສ່ປະຫວັດ</p></div>
             <button onclick="runAI('plan')" class="bg-blue-600 text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-blue-700 transition">ສ້າງແຜນ</button>
         </div>
         <div id="planContainer" class="p-4 text-sm text-slate-400 italic">ກົດ "ສ້າງແຜນ" ເພື່ອໃຫ້ AI ແນະນຳ...</div>
@@ -168,7 +179,7 @@
             <div class="w-2.5 h-2.5 bg-purple-400 rounded-full animate-bounce" style="animation-delay:.15s"></div>
             <div class="w-2.5 h-2.5 bg-pink-400 rounded-full animate-bounce" style="animation-delay:.3s"></div>
         </div>
-        <p class="text-xs text-slate-400" id="aiLoaderText">Gemini ກຳລັງວິເຄາະ...</p>
+        <p id="aiLoaderText" class="text-xs text-slate-400">Gemini ກຳລັງວິເຄາະ...</p>
     </div>
 </div>
 
@@ -187,16 +198,16 @@
 </div>
 
 <!-- FAB -->
-<div id="fab-budget" class="fixed bottom-6 left-0 right-0 flex justify-center z-50 pointer-events-none pb-safe">
+<div id="fab-budget" class="fixed bottom-6 left-0 right-0 flex justify-center z-50 pointer-events-none">
     <button onclick="openAddModal()" class="pointer-events-auto w-16 h-16 bg-blue-600 text-white rounded-full shadow-2xl shadow-blue-400 flex items-center justify-center text-3xl hover:scale-110 active:scale-90 transition-all">+</button>
 </div>
 
 <!-- Transaction Modal -->
 <div id="modal" class="fixed inset-0 bg-slate-900/40 hidden z-[60] flex items-end sm:items-center justify-center p-4 backdrop-blur-sm">
-    <div class="modal-enter bg-white w-full max-w-md rounded-t-[3rem] sm:rounded-[3rem] p-7 space-y-4 shadow-2xl pb-safe">
+    <div class="modal-enter bg-white w-full max-w-md rounded-t-[3rem] sm:rounded-[3rem] p-7 space-y-4 shadow-2xl">
         <div class="flex justify-between items-center">
             <h3 id="modalTitle" class="text-xl font-bold">ບັນທຶກໃໝ່</h3>
-            <button onclick="closeModal()" class="text-slate-300 hover:text-slate-600 text-4xl leading-none">&times;</button>
+            <button onclick="closeModal()" class="text-slate-300 text-4xl leading-none">&times;</button>
         </div>
         <input type="hidden" id="editId">
         <div>
@@ -218,9 +229,7 @@
         </div>
         <div>
             <label class="text-[10px] font-black text-slate-400 uppercase ml-1">ຈຳນວນເງິນ (ກີບ)</label>
-            <input id="amountDisplay" type="text" inputmode="numeric" placeholder="0"
-                oninput="formatAmountInput(this)"
-                class="w-full mt-1 p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-100 text-3xl font-bold text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none tracking-wide">
+            <input id="amountDisplay" type="text" inputmode="numeric" placeholder="0" oninput="formatAmountInput(this)" class="w-full mt-1 p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-100 text-3xl font-bold text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none">
             <div class="flex gap-2 mt-2">
                 <button onclick="quickAmount(10000)"   class="flex-1 text-[10px] font-bold py-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition">10K</button>
                 <button onclick="quickAmount(50000)"   class="flex-1 text-[10px] font-bold py-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition">50K</button>
@@ -236,12 +245,58 @@
     </div>
 </div>
 
+<!-- Goal Modal -->
+<div id="goalModal" class="fixed inset-0 bg-slate-900/40 hidden z-[60] flex items-end sm:items-center justify-center p-4 backdrop-blur-sm">
+    <div class="modal-enter bg-white w-full max-w-md rounded-t-[3rem] sm:rounded-[3rem] p-7 space-y-4 shadow-2xl">
+        <div class="flex justify-between items-center">
+            <h3 id="goalModalTitle" class="text-xl font-bold">ສ້າງເປົ້າໝາຍ</h3>
+            <button onclick="closeGoalModal()" class="text-slate-300 text-4xl leading-none">&times;</button>
+        </div>
+        <input type="hidden" id="goalEditId">
+        <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="text-[10px] font-black text-slate-400 uppercase ml-1">Emoji Icon</label>
+                <input id="goalIcon" type="text" placeholder="🎯" maxlength="2" class="w-full mt-1 p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-100 focus:ring-2 focus:ring-blue-500 outline-none text-2xl text-center">
+            </div>
+            <div>
+                <label class="text-[10px] font-black text-slate-400 uppercase ml-1">ສີ</label>
+                <select id="goalColor" class="w-full mt-1 p-3.5 bg-slate-50 rounded-2xl ring-1 ring-slate-100 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                    <option value="bg-blue-500">🔵 ສີຟ້າ</option>
+                    <option value="bg-emerald-500">🟢 ສີຂຽວ</option>
+                    <option value="bg-purple-500">🟣 ສີມ່ວງ</option>
+                    <option value="bg-rose-500">🔴 ສີແດງ</option>
+                    <option value="bg-orange-500">🟠 ສີສົ້ມ</option>
+                    <option value="bg-amber-500">🟡 ສີເຫຼືອງ</option>
+                    <option value="bg-pink-500">🩷 ສີຊົມພູ</option>
+                </select>
+            </div>
+        </div>
+        <div>
+            <label class="text-[10px] font-black text-slate-400 uppercase ml-1">ຊື່ເປົ້າໝາຍ</label>
+            <input id="goalName" type="text" placeholder="ຊື້ລົດ, ທ່ອງທ່ຽວ, ສຸກເສີນ..." class="w-full mt-1 p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-100 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+        </div>
+        <div>
+            <label class="text-[10px] font-black text-slate-400 uppercase ml-1">ໝວດໝູ່ (ໃຊ້ໃນລາຍຈ່າຍ)</label>
+            <input id="goalCategory" type="text" placeholder="ທ້ອນ-ລົດ, ທ້ອນ-ທ່ຽວ..." class="w-full mt-1 p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-100 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+            <p class="text-[10px] text-slate-400 mt-1 ml-1">💡 ໃສ່ຊື່ໝວດນີ້ຕອນບັນທຶກລາຍຈ່າຍ</p>
+        </div>
+        <div>
+            <label class="text-[10px] font-black text-slate-400 uppercase ml-1">ເປົ້າໝາຍ (ກີບ)</label>
+            <input id="goalTarget" type="text" inputmode="numeric" placeholder="0" oninput="formatAmountInput(this)" class="w-full mt-1 p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-100 text-2xl font-bold text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div class="flex gap-3 pt-1">
+            <button id="goalDeleteBtn" onclick="deleteGoal()" class="hidden bg-rose-50 text-rose-500 font-bold px-5 py-4 rounded-2xl hover:bg-rose-100 transition text-sm">ລຶບ</button>
+            <button onclick="saveGoal()" class="flex-1 bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition active:scale-95">ຢືນຢັນ</button>
+        </div>
+    </div>
+</div>
+
 <!-- Split Modal -->
 <div id="splitModal" class="fixed inset-0 bg-slate-900/40 hidden z-[60] flex items-end sm:items-center justify-center p-4 backdrop-blur-sm">
     <div class="modal-enter bg-white w-full max-w-md rounded-t-[3rem] sm:rounded-[3rem] p-7 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center">
             <h3 class="text-xl font-bold">🤝 ແບ່ງບິນໃໝ່</h3>
-            <button onclick="closeSplitModal()" class="text-slate-300 hover:text-slate-600 text-4xl leading-none">&times;</button>
+            <button onclick="closeSplitModal()" class="text-slate-300 text-4xl leading-none">&times;</button>
         </div>
         <div>
             <label class="text-[10px] font-black text-slate-400 uppercase ml-1">ຊື່ບິນ</label>
@@ -249,9 +304,7 @@
         </div>
         <div>
             <label class="text-[10px] font-black text-slate-400 uppercase ml-1">ຍອດທັງໝົດ (ກີບ)</label>
-            <input id="splitTotal" type="text" inputmode="numeric" placeholder="0"
-                oninput="formatAmountInput(this);recalcSplit()"
-                class="w-full mt-1 p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-100 text-2xl font-bold text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none">
+            <input id="splitTotal" type="text" inputmode="numeric" placeholder="0" oninput="formatAmountInput(this);recalcSplit()" class="w-full mt-1 p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-100 text-2xl font-bold text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none">
         </div>
         <div>
             <div class="flex justify-between items-center mb-2">
@@ -261,7 +314,7 @@
             <div id="participantRows" class="space-y-2"></div>
         </div>
         <div id="splitSummary" class="hidden bg-blue-50 rounded-2xl p-4 text-sm text-blue-700 space-y-1"></div>
-        <button onclick="saveSplitBill()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition active:scale-95">ບັນທຶກ</button>
+        <button onclick="saveSplitBill()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-blue-700 transition active:scale-95">ບັນທຶກ</button>
     </div>
 </div>
 
@@ -274,82 +327,132 @@
     </div>
 </div>
 
+</div><!-- end mainApp -->
+
 <script>
 // ── Config ────────────────────────────────────────────────────────────
 const SUPABASE_URL = 'https://obaidxqbmbkhbcsfvrff.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9iYWlkeHFibWJraGJjc2Z2cmZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3MTM0MjQsImV4cCI6MjA4OTI4OTQyNH0.yyy7fVwm4p1rv0kfpt3_qYPBE4r_CLk1Srs395lhdzY';
 const GEMINI_KEY   = 'AIzaSyCPChRbGrKa32dAN3qO2s0JAgqiSNdbc40';
+const GEMINI_URL   = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`;
 
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let userId = localStorage.getItem('kob_uid');
-if (!userId) { userId = 'u_' + crypto.randomUUID(); localStorage.setItem('kob_uid', userId); }
+// ── State ─────────────────────────────────────────────────────────────
+let currentPin = '';
+let userPin    = null;
+let transactions = [], splitBills = [], savingGoals = [];
+let chartInstance = null, currentFilter = 'month', currentPlan = null, participantCount = 0;
 
-let transactions=[], splitBills=[], chartInstance=null, currentFilter='month', currentPlan=null, participantCount=0;
-let deferredInstallPrompt = null;
-
-const goals = [
-    { name:'ສຸກເສີນ (Emergency)', target:10000000, cat:'ທ້ອນ-ສຸກເສີນ',     icon:'🚑', color:'bg-rose-500'   },
-    { name:'ຫູຟັງ (Headphones)',   target:3000000,  cat:'ທ້ອນ-ຫູຟັງ',        icon:'🎧', color:'bg-purple-500' },
-    { name:'ທ່ອງທ່ຽວ (Travel)',    target:20000000, cat:'ທ້ອນ-ການທ່ອງທ່ຽວ', icon:'✈️', color:'bg-orange-500' }
-];
-const categories = {
+const baseCategories = {
     income:  ['ເງິນເດືອນ','ເງິນພາກສະໜາມ','ໝູ່ຈ່າຍຄືນ','ລາຍຮັບອື່ນໆ'],
-    expense: ['ອາຫານຫຼັກ','ກິນດື່ມ/ສັງສັນ','ຂອງກິນຢາກ','ຜ່ອນໂທລະສັບ','ຄ່າເນັດ','ໃຊ້ໜີ້ແມ່','ທ້ອນ-ສຸກເສີນ','ທ້ອນ-ຫູຟັງ','ທ້ອນ-ການທ່ອງທ່ຽວ','ອື່ນໆ']
+    expense: ['ອາຫານຫຼັກ','ກິນດື່ມ/ສັງສັນ','ຂອງກິນຢາກ','ຜ່ອນໂທລະສັບ','ຄ່າເນັດ','ໃຊ້ໜີ້ແມ່','ອື່ນໆ']
 };
-
-// ── PWA Install ───────────────────────────────────────────────────────
-window.addEventListener('beforeinstallprompt', e => {
-    e.preventDefault();
-    deferredInstallPrompt = e;
-    // Show banner after 3 seconds
-    setTimeout(() => {
-        if (!localStorage.getItem('pwa_dismissed')) {
-            document.getElementById('installBanner').style.display = 'flex';
-        }
-    }, 3000);
-});
-function installApp() {
-    if (!deferredInstallPrompt) return;
-    deferredInstallPrompt.prompt();
-    deferredInstallPrompt.userChoice.then(r => {
-        if (r.outcome === 'accepted') showToast('🎉 ຕິດຕັ້ງ App ສຳເລັດ!');
-        deferredInstallPrompt = null;
-        document.getElementById('installBanner').style.display = 'none';
-    });
-}
-function dismissInstall() {
-    document.getElementById('installBanner').style.display = 'none';
-    localStorage.setItem('pwa_dismissed', '1');
-}
-window.addEventListener('appinstalled', () => showToast('🎉 App ພ້ອມໃຊ້ງານແລ້ວ!'));
-
-// ── Service Worker ────────────────────────────────────────────────────
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(() => {});
-    });
-}
-
-// ── Toast ─────────────────────────────────────────────────────────────
-function showToast(msg, ms=2500) {
-    const t=document.getElementById('toast');
-    t.innerText=msg; t.style.opacity='1';
-    setTimeout(()=>t.style.opacity='0', ms);
-}
 
 // ── Helpers ───────────────────────────────────────────────────────────
 function fmt(n)  { return Math.round(Number(n)||0).toLocaleString('en-US'); }
 function parse(s){ return parseFloat((s||'').replace(/,/g,''))||0; }
+function showToast(msg, ms=2500) {
+    const t=document.getElementById('toast');
+    t.innerText=msg; t.style.opacity='1';
+    clearTimeout(t._t); t._t=setTimeout(()=>t.style.opacity='0',ms);
+}
 function formatAmountInput(el) {
     const raw=el.value.replace(/[^0-9]/g,'');
     if(!raw){el.value='';return;}
-    const pos=el.selectionStart,oldLen=el.value.length;
+    const pos=el.selectionStart,old=el.value.length;
     el.value=Number(raw).toLocaleString('en-US');
-    try{const d=el.value.length-oldLen;el.setSelectionRange(pos+d,pos+d);}catch(e){}
+    try{const d=el.value.length-old;el.setSelectionRange(pos+d,pos+d);}catch(e){}
 }
 function quickAmount(n){document.getElementById('amountDisplay').value=n.toLocaleString('en-US');}
+
+// ── PIN ───────────────────────────────────────────────────────────────
+function pinPress(n) {
+    if(currentPin.length>=4)return;
+    currentPin+=n;
+    updatePinDots();
+    if(currentPin.length===4) setTimeout(submitPin,120);
+}
+function pinBackspace() { currentPin=currentPin.slice(0,-1); updatePinDots(); }
+function pinClear()     { currentPin=''; updatePinDots(); }
+function updatePinDots() {
+    for(let i=0;i<4;i++){
+        document.getElementById('dot'+i).classList.toggle('filled',i<currentPin.length);
+    }
+}
+async function submitPin() {
+    const pin=currentPin;
+    currentPin='';updatePinDots();
+    // Check if PIN exists
+    const {data}=await db.from('user_pins').select('pin').eq('pin',pin).single();
+    if(data) {
+        // existing PIN — login
+        userPin=pin;
+        enterApp();
+    } else {
+        // new PIN — register (first time or wrong)
+        const savedPin=localStorage.getItem('kob_pin');
+        if(!savedPin) {
+            // First time: create PIN
+            await db.from('user_pins').insert({pin});
+            localStorage.setItem('kob_pin',pin);
+            userPin=pin;
+            enterApp();
+        } else if(pin===savedPin) {
+            // PIN matches local but not in DB yet (edge case) — re-insert
+            await db.from('user_pins').upsert({pin});
+            userPin=pin;
+            enterApp();
+        } else {
+            // Wrong PIN
+            showPinError();
+        }
+    }
+}
+function showPinError() {
+    const err=document.getElementById('pinError');
+    err.style.opacity='1';
+    document.getElementById('pinLabel').innerText='ໃສ່ PIN 4 ຕົວ';
+    setTimeout(()=>err.style.opacity='0',2000);
+}
+function enterApp() {
+    document.getElementById('pinScreen').style.display='none';
+    document.getElementById('mainApp').classList.remove('hidden');
+    setFilter('month');updateCategories();
+    loadAll();
+}
+function lockApp() {
+    document.getElementById('mainApp').classList.add('hidden');
+    document.getElementById('pinScreen').style.display='flex';
+    currentPin='';updatePinDots();
+}
+
+// Auto-login if PIN saved locally
+window.addEventListener('load', ()=>{
+    const saved=localStorage.getItem('kob_pin');
+    if(saved){ document.getElementById('pinLabel').innerText='ໃສ່ PIN ຂອງທ່ານ'; }
+    if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+});
+
+// ── Load ──────────────────────────────────────────────────────────────
+async function loadAll() { await Promise.all([loadTransactions(),loadSplitBills(),loadGoals()]); }
+
+async function loadTransactions() {
+    const {data,error}=await db.from('transactions').select('*').eq('user_id',userPin).order('created_at',{ascending:false});
+    document.getElementById('loadingHistory').classList.add('hidden');
+    if(error){showToast('❌ ໂຫຼດຂໍ້ມູນບໍ່ໄດ້: '+error.message);return;}
+    transactions=data||[];
+    renderBudget();renderGoals();
+}
+async function loadSplitBills() {
+    const {data}=await db.from('split_bills').select('*, split_participants(*)').eq('user_id',userPin).order('created_at',{ascending:false});
+    splitBills=data||[];renderSplit();
+}
+async function loadGoals() {
+    const {data}=await db.from('saving_goals').select('*').eq('pin',userPin).order('created_at',{ascending:true});
+    savingGoals=data||[];renderGoals();
+}
 
 // ── Filter ────────────────────────────────────────────────────────────
 function setFilter(f) {
@@ -371,52 +474,14 @@ function filterTx() {
     });
 }
 
-// ── Load ──────────────────────────────────────────────────────────────
-async function loadAll() { await Promise.all([loadTransactions(),loadSplitBills()]); }
-
-async function loadTransactions() {
-    const {data,error}=await db.from('transactions').select('*').eq('user_id',userId).order('created_at',{ascending:false});
-    document.getElementById('loadingHistory').classList.add('hidden');
-    if(error){showToast('❌ ໂຫຼດຂໍ້ມູນບໍ່ໄດ້');return;}
-    transactions=data||[];
-    renderBudget();
-}
-async function loadSplitBills() {
-    const {data,error}=await db.from('split_bills').select('*, split_participants(*)').eq('user_id',userId).order('created_at',{ascending:false});
-    if(error) return;
-    splitBills=data||[];
-    renderSplit();
-}
-
 // ── Render Budget ─────────────────────────────────────────────────────
 function renderBudget() {
     const filtered=filterTx();
     let income=0,expense=0;
     filtered.forEach(t=>{const a=Number(t.amount)||0;t.type==='income'?income+=a:expense+=a;});
-    const savings={'ທ້ອນ-ສຸກເສີນ':0,'ທ້ອນ-ຫູຟັງ':0,'ທ້ອນ-ການທ່ອງທ່ຽວ':0};
-    transactions.forEach(t=>{if(t.type==='expense'&&savings[t.category]!==undefined)savings[t.category]+=Number(t.amount)||0;});
-
     document.getElementById('spendingBalance').innerText=fmt(income-expense)+' ກີບ';
     document.getElementById('totalIncome').innerText=fmt(income);
     document.getElementById('totalExpense').innerText=fmt(expense);
-
-    document.getElementById('goalList').innerHTML=goals.map(g=>{
-        const saved=savings[g.cat]||0,pct=Math.min((saved/g.target)*100,100).toFixed(0);
-        return `<div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-50 flex items-center gap-4">
-            <div class="bg-slate-50 p-3 rounded-xl text-xl flex-shrink-0">${g.icon}</div>
-            <div class="flex-1 min-w-0">
-                <div class="flex justify-between mb-1">
-                    <p class="font-bold text-slate-700 text-xs truncate">${g.name}</p>
-                    <p class="text-[10px] font-bold text-blue-600 ml-2 flex-shrink-0">${(saved/1000000).toFixed(1)}M/${(g.target/1000000).toFixed(0)}M</p>
-                </div>
-                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                    <div class="${g.color} h-full rounded-full transition-all duration-700" style="width:${pct}%"></div>
-                </div>
-                <p class="text-[9px] text-slate-400 mt-1">${pct}% · ຕ້ອງການ ${fmt(g.target-saved)} ກີບ</p>
-            </div>
-        </div>`;
-    }).join('');
-
     const list=document.getElementById('historyList'),empty=document.getElementById('emptyHistory');
     if(!filtered.length){list.innerHTML='';empty.classList.remove('hidden');return;}
     empty.classList.add('hidden');
@@ -425,35 +490,111 @@ function renderBudget() {
             class="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm active:scale-[0.98] transition cursor-pointer border border-transparent hover:border-blue-100">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl flex items-center justify-center text-base flex-shrink-0 ${t.type==='income'?'bg-emerald-50 text-emerald-600':'bg-rose-50 text-rose-600'}">${t.type==='income'?'↓':'↑'}</div>
-                <div>
-                    <p class="font-bold text-slate-800 text-sm">${t.description||'-'}</p>
-                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">${t.category||''}</p>
-                </div>
+                <div><p class="font-bold text-slate-800 text-sm">${t.description||'-'}</p><p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">${t.category||''}</p></div>
             </div>
             <p class="font-bold text-sm flex-shrink-0 ml-2 ${t.type==='income'?'text-emerald-600':'text-slate-700'}">${t.type==='income'?'+':'-'}${fmt(t.amount)}</p>
         </div>`).join('');
 }
 
-// ── CRUD ──────────────────────────────────────────────────────────────
+// ── Render Goals ──────────────────────────────────────────────────────
+function renderGoals() {
+    const list=document.getElementById('goalList'),empty=document.getElementById('emptyGoals');
+    if(!savingGoals.length){list.innerHTML='';empty.classList.remove('hidden');return;}
+    empty.classList.add('hidden');
+
+    // calc savings per category from ALL transactions
+    const savingsMap={};
+    transactions.forEach(t=>{
+        if(t.type==='expense') savingsMap[t.category]=(savingsMap[t.category]||0)+Number(t.amount);
+    });
+
+    list.innerHTML=savingGoals.map(g=>{
+        const saved=savingsMap[g.category]||0;
+        const pct=Math.min((saved/g.target)*100,100).toFixed(0);
+        return `<div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-50">
+            <div class="flex items-center gap-4">
+                <div class="bg-slate-50 p-3 rounded-xl text-xl flex-shrink-0">${g.icon||'🎯'}</div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex justify-between mb-1">
+                        <p class="font-bold text-slate-700 text-sm truncate">${g.name}</p>
+                        <p class="text-[10px] font-bold text-blue-600 ml-2 flex-shrink-0">${(saved/1000000).toFixed(1)}M/${(g.target/1000000).toFixed(1)}M</p>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div class="${g.color||'bg-blue-500'} h-full rounded-full transition-all duration-700" style="width:${pct}%"></div>
+                    </div>
+                    <div class="flex justify-between mt-1">
+                        <p class="text-[9px] text-slate-400">${pct}% · ຕ້ອງການ ${fmt(g.target-saved)} ກີບ</p>
+                        <p class="text-[9px] text-slate-400">ໝວດ: ${g.category}</p>
+                    </div>
+                </div>
+                <button onclick="openGoalModal('${g.id}')" class="text-slate-300 hover:text-blue-500 text-lg p-1">✏️</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ── Goal CRUD ─────────────────────────────────────────────────────────
+function openGoalModal(id) {
+    const g=id?savingGoals.find(x=>x.id===id):null;
+    document.getElementById('goalModalTitle').innerText=g?'ແກ້ໄຂເປົ້າໝາຍ':'ສ້າງເປົ້າໝາຍ';
+    document.getElementById('goalEditId').value=id||'';
+    document.getElementById('goalIcon').value=g?.icon||'🎯';
+    document.getElementById('goalColor').value=g?.color||'bg-blue-500';
+    document.getElementById('goalName').value=g?.name||'';
+    document.getElementById('goalCategory').value=g?.category||'';
+    document.getElementById('goalTarget').value=g?fmt(g.target):'';
+    document.getElementById('goalDeleteBtn').classList.toggle('hidden',!g);
+    document.getElementById('goalModal').classList.remove('hidden');
+}
+function closeGoalModal(){document.getElementById('goalModal').classList.add('hidden');}
+async function saveGoal() {
+    const id=document.getElementById('goalEditId').value;
+    const name=document.getElementById('goalName').value.trim();
+    const category=document.getElementById('goalCategory').value.trim();
+    const target=parse(document.getElementById('goalTarget').value);
+    if(!name||!category||!target){showToast('⚠️ ກະລຸນາຕື່ມຂໍ້ມູນໃຫ້ຄົບ');return;}
+    const data={pin:userPin,name,icon:document.getElementById('goalIcon').value||'🎯',color:document.getElementById('goalColor').value,category,target};
+    const {error}=id?await db.from('saving_goals').update(data).eq('id',id):await db.from('saving_goals').insert(data);
+    if(error){showToast('❌ ບັນທຶກບໍ່ສຳເລັດ');return;}
+    showToast('✅ ບັນທຶກສຳເລັດ!');closeGoalModal();loadGoals();updateCategories();
+}
+async function deleteGoal() {
+    const id=document.getElementById('goalEditId').value;
+    if(!id||!confirm('ລຶບເປົ້າໝາຍນີ້?'))return;
+    await db.from('saving_goals').delete().eq('id',id);
+    showToast('🗑️ ລຶບສຳເລັດ');closeGoalModal();loadGoals();
+}
+
+// ── Categories (includes goal categories) ────────────────────────────
+function getExpenseCategories() {
+    const goalCats=savingGoals.map(g=>g.category).filter(Boolean);
+    return [...baseCategories.expense,...goalCats.filter(c=>!baseCategories.expense.includes(c))];
+}
+function updateCategories() {
+    const type=document.getElementById('type')?.value||'expense';
+    const cats=type==='income'?baseCategories.income:getExpenseCategories();
+    const sel=document.getElementById('category');
+    if(sel) sel.innerHTML=cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+}
+
+// ── Transaction CRUD ──────────────────────────────────────────────────
 async function saveTransaction() {
     const id=document.getElementById('editId').value;
     const amt=parse(document.getElementById('amountDisplay').value);
     if(amt<=0){showToast('⚠️ ໃສ່ຈຳນວນເງິນ');return;}
     const btn=document.getElementById('saveBtn');
     btn.innerText='ກຳລັງບັນທຶກ...';btn.disabled=true;
-    const data={user_id:userId,description:document.getElementById('desc').value||'ບໍ່ລະບຸ',type:document.getElementById('type').value,category:document.getElementById('category').value,amount:amt};
+    const data={user_id:userPin,description:document.getElementById('desc').value||'ບໍ່ລະບຸ',type:document.getElementById('type').value,category:document.getElementById('category').value,amount:amt};
     const {error}=id?await db.from('transactions').update(data).eq('id',id):await db.from('transactions').insert(data);
     btn.innerText='ຢືນຢັນ';btn.disabled=false;
-    if(error){showToast('❌ ບັນທຶກບໍ່ສຳເລັດ: '+error.message);return;}
-    showToast('✅ ບັນທຶກສຳເລັດ!');
-    closeModal();loadTransactions();
+    if(error){showToast('❌ '+error.message);return;}
+    showToast('✅ ບັນທຶກສຳເລັດ!');closeModal();loadTransactions();
 }
 async function deleteTransaction() {
     const id=document.getElementById('editId').value;
     if(!id||!confirm('ລຶບລາຍການນີ້?'))return;
     await db.from('transactions').delete().eq('id',id);
-    showToast('🗑️ ລຶບສຳເລັດ');
-    closeModal();loadTransactions();
+    showToast('🗑️ ລຶບສຳເລັດ');closeModal();loadTransactions();
 }
 
 // ── CSV ───────────────────────────────────────────────────────────────
@@ -468,42 +609,69 @@ function exportCSV() {
     a.click();showToast('📥 ດາວໂຫຼດສຳເລັດ!');
 }
 
-// ── Gemini ────────────────────────────────────────────────────────────
-async function callGemini(prompt,system) {
-    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],systemInstruction:{parts:[{text:system}]}})});
-    const d=await r.json();
-    return d.candidates?.[0]?.content?.parts?.[0]?.text||'AI ບໍ່ຕອບ';
+// ── Gemini AI (fixed model) ───────────────────────────────────────────
+async function callGemini(prompt, system) {
+    const res = await fetch(GEMINI_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            systemInstruction: { parts: [{ text: system }] },
+            generationConfig: { maxOutputTokens: 1024, temperature: 0.7 }
+        })
+    });
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const d = await res.json();
+    if (d.error) throw new Error(d.error.message);
+    return d.candidates?.[0]?.content?.parts?.[0]?.text || 'AI ບໍ່ຕອບ';
 }
+
 function buildSummary() {
     const f=filterTx();let income=0,expense=0;const catMap={};
     f.forEach(t=>{const a=Number(t.amount)||0;t.type==='income'?income+=a:(expense+=a,catMap[t.category]=(catMap[t.category]||0)+a);});
-    const savings={'ທ້ອນ-ສຸກເສີນ':0,'ທ້ອນ-ຫູຟັງ':0,'ທ້ອນ-ການທ່ອງທ່ຽວ':0};
-    transactions.forEach(t=>{if(t.type==='expense'&&savings[t.category]!==undefined)savings[t.category]+=Number(t.amount)||0;});
-    return{income,expense,balance:income-expense,catMap,savings};
+    const savingsMap={};
+    transactions.forEach(t=>{if(t.type==='expense')savingsMap[t.category]=(savingsMap[t.category]||0)+Number(t.amount);});
+    const goalsSummary=savingGoals.map(g=>({name:g.name,target:g.target,saved:savingsMap[g.category]||0}));
+    return {income,expense,balance:income-expense,catMap,goalsSummary};
 }
+
 const aiTitles={summary:'📊 ສະຫຼຸບລາຍຈ່າຍ',warning:'⚠️ ສັນຍານເຕືອນ',goal:'🎯 ທຳນາຍເປົ້າໝາຍ',timing:'📅 ເວລາທີ່ດີ'};
+
 async function runAI(type) {
     const s=buildSummary();
     const loader=document.getElementById('aiLoader'),resultBox=document.getElementById('aiResultBox');
     resultBox.classList.add('hidden');document.getElementById('applyPlanBtn').classList.add('hidden');
     loader.classList.remove('hidden');
     document.getElementById('aiLoaderText').innerText=type==='plan'?'Gemini ກຳລັງສ້າງແຜນ...':'Gemini ກຳລັງວິເຄາະ...';
-    const tx=`ລາຍຮັບ:${fmt(s.income)},ລາຍຈ່າຍ:${fmt(s.expense)},ຄົງເຫຼືອ:${fmt(s.balance)} ກີບ. ໝວດ:${JSON.stringify(s.catMap)}. ທ້ອນ:Em=${fmt(s.savings['ທ້ອນ-ສຸກເສີນ'])},HP=${fmt(s.savings['ທ້ອນ-ຫູຟັງ'])},Tr=${fmt(s.savings['ທ້ອນ-ການທ່ອງທ່ຽວ'])}.`;
-    const g='ເປົ້າ:Em=10M,HP=3M,Tr=20M ກີບ';
-    const sys='ທ່ານເປັນທີ່ປຶກສາການເງິນ. ຕອບລາວ ສັ້ນ ຊັດ. emoji ພໍດີ.';
-    const prompts={summary:`${tx} ສະຫຼຸບໝວດລາຍຈ່າຍ.`,warning:`${tx} ໝວດໃດເກີນ/ສ່ຽງ?`,goal:`${tx} ${g} ທຳນາຍໄລຍະຮອດເປົ້າ.`,timing:`${tx} ຄວນປະຢັດ/ລະວັງຕອນໃດ?`,plan:`${tx} ${g} ສ້າງແຜນງົບເດືອນໜ້າ JSON:[{"category":"","budget":0,"reason":""}] ສະເພາະ JSON.`};
+
+    const tx=`ລາຍຮັບ:${fmt(s.income)}, ລາຍຈ່າຍ:${fmt(s.expense)}, ຄົງເຫຼືອ:${fmt(s.balance)} ກີບ. ໝວດ:${JSON.stringify(s.catMap)}.`;
+    const goalsInfo=`ເປົ້າໝາຍ:${JSON.stringify(s.goalsSummary)}`;
+    const sys='ທ່ານເປັນທີ່ປຶກສາການເງິນ. ຕອບພາສາລາວ ສັ້ນ ຊັດ ມີປະໂຫຍດ. ໃຊ້ emoji ພໍດີ.';
+    const prompts={
+        summary:`${tx} ສະຫຼຸບລາຍຈ່າຍຕາມໝວດ ໝວດໃດຫຼາຍ/ໜ້ອຍສຸດ?`,
+        warning:`${tx} ໝວດໃດໃຊ້ຈ່າຍເກີນ/ສ່ຽງ? ໃຫ້ຄຳແນະນຳ.`,
+        goal:`${tx} ${goalsInfo} ທຳນາຍວ່າຈະບັນລຸເປົ້າໝາຍໃນກີ່ເດືອນ.`,
+        timing:`${tx} ຄວນລະວັງໃຊ້ຈ່າຍ ແລະ ຄວນທ້ອນຕອນໃດ?`,
+        plan:`${tx} ${goalsInfo} ສ້າງແຜນງົບລາຍຈ່າຍເດືອນໜ້າ. ຕອບ JSON array ດຽວ: [{"category":"ຊື່","budget":0,"reason":""}]. JSON ເທົ່ານັ້ນ ບໍ່ມີ markdown.`
+    };
+
     try {
-        const res=await callGemini(prompts[type],type==='plan'?'Return ONLY valid JSON array, no markdown.':sys);
+        const result=await callGemini(prompts[type], type==='plan'?'Return ONLY a valid JSON array. No markdown, no explanation.':sys);
         loader.classList.add('hidden');
-        if(type==='plan'){renderPlan(res);return;}
+        if(type==='plan'){renderPlan(result);return;}
         document.getElementById('aiResultTitle').innerText=aiTitles[type];
-        document.getElementById('aiResultContent').innerHTML=res.split('\n').filter(Boolean).map(l=>`<p class="py-0.5">${l}</p>`).join('');
+        document.getElementById('aiResultContent').innerHTML=result.split('\n').filter(Boolean).map(l=>`<p class="py-0.5">${l}</p>`).join('');
         resultBox.classList.remove('hidden');
-    }catch(e){loader.classList.add('hidden');showToast('❌ AI ຜິດພາດ');}
+    } catch(e) {
+        loader.classList.add('hidden');
+        showToast('❌ AI ຜິດພາດ: '+e.message);
+    }
 }
+
 function renderPlan(raw) {
     let plan=[];
-    try{plan=JSON.parse(raw.replace(/```json|```/g,'').trim());}catch(e){document.getElementById('planContainer').innerHTML='<p class="text-rose-500 text-sm p-1">ລອງໃໝ່.</p>';return;}
+    try{plan=JSON.parse(raw.replace(/```json|```/g,'').trim());}
+    catch(e){document.getElementById('planContainer').innerHTML='<p class="text-rose-500 text-sm">ລອງໃໝ່.</p>';return;}
     currentPlan=plan;
     const s=buildSummary();
     document.getElementById('planContainer').innerHTML=plan.map(item=>{
@@ -512,25 +680,25 @@ function renderPlan(raw) {
         return `<div class="plan-card ${cls} bg-slate-50 rounded-xl p-3 mb-2">
             <div class="flex justify-between"><p class="font-bold text-slate-700 text-sm">${item.category}</p><p class="font-bold text-blue-600 text-sm">${fmt(item.budget)} ກີບ</p></div>
             <p class="text-[10px] text-slate-500 mt-0.5">${item.reason}</p>
-            <p class="text-[9px] mt-1 ${diff<0?'text-rose-500':'text-emerald-500'}">${diff<0?'↓ ຫຼຸດລົງ':'↑ ເພີ່ມຂຶ້ນ'} ${fmt(Math.abs(diff))} ກ່ວາເດືອນນີ້</p>
+            <p class="text-[9px] mt-1 ${diff<0?'text-rose-500':'text-emerald-500'}">${diff<0?'↓':'↑'} ${fmt(Math.abs(diff))} ກ່ວາເດືອນນີ້</p>
         </div>`;
     }).join('');
     document.getElementById('applyPlanBtn').classList.remove('hidden');
 }
+
 async function applyPlan() {
     if(!currentPlan?.length||!confirm('ເພີ່ມງົບ AI ເຂົ້າລາຍການ?'))return;
-    await db.from('transactions').insert(currentPlan.map(i=>({user_id:userId,description:`[AI] ${i.category}`,type:'expense',category:i.category,amount:i.budget})));
-    showToast('✅ ນຳໃຊ້ແຜນ AI ແລ້ວ!');
-    loadTransactions();fireConfetti();
+    await db.from('transactions').insert(currentPlan.map(i=>({user_id:userPin,description:`[AI] ${i.category}`,type:'expense',category:i.category,amount:i.budget})));
+    showToast('✅ ນຳໃຊ້ແຜນ AI ແລ້ວ!');loadTransactions();fireConfetti();
 }
 
 // ── Confetti ──────────────────────────────────────────────────────────
 function fireConfetti() {
     const c=document.getElementById('confettiContainer');
-    ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#ec4899'].forEach((col,i)=>{
+    ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#ec4899'].forEach(col=>{
         for(let j=0;j<5;j++){
             const d=document.createElement('div');d.className='confetti-piece';
-            d.style.cssText=`left:${15+Math.random()*70}%;top:${30+Math.random()*30}%;background:${col};animation-delay:${Math.random()*0.5}s;animation-duration:${0.7+Math.random()*0.6}s`;
+            d.style.cssText=`left:${15+Math.random()*70}%;top:${30+Math.random()*30}%;background:${col};animation-delay:${Math.random()*0.5}s;animation-duration:${0.7+Math.random()*0.5}s`;
             c.appendChild(d);setTimeout(()=>d.remove(),1600);
         }
     });
@@ -544,7 +712,7 @@ function addParticipantRow(name='',amount='') {
     row.innerHTML=`<div class="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center text-xs font-bold text-blue-600 flex-shrink-0">${participantCount}</div>
         <input type="text" placeholder="ຊື່ໝູ່" value="${name}" oninput="recalcSplit()" class="flex-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-100 focus:ring-2 focus:ring-blue-400 outline-none text-sm name-input">
         <input type="text" inputmode="numeric" placeholder="ກີບ" value="${amount?Number(amount).toLocaleString('en-US'):''}" oninput="formatAmountInput(this);recalcSplit()" class="w-28 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-100 focus:ring-2 focus:ring-blue-400 outline-none text-sm font-bold text-blue-600 amount-input">
-        <button onclick="document.getElementById('${id}').remove();recalcSplit()" class="text-slate-300 hover:text-rose-400 text-xl leading-none flex-shrink-0">×</button>`;
+        <button onclick="document.getElementById('${id}').remove();recalcSplit()" class="text-slate-300 hover:text-rose-400 text-xl leading-none">×</button>`;
     document.getElementById('participantRows').appendChild(row);recalcSplit();
 }
 function recalcSplit() {
@@ -564,7 +732,7 @@ async function saveSplitBill() {
     const total=parse(document.getElementById('splitTotal').value);
     const rows=document.querySelectorAll('#participantRows > div');
     if(!rows.length||!total){showToast('⚠️ ໃສ່ຍອດ ແລະ ຜູ້ຮ່ວມ');return;}
-    const {data:bill,error}=await db.from('split_bills').insert({user_id:userId,title,total_amount:total}).select().single();
+    const {data:bill,error}=await db.from('split_bills').insert({user_id:userPin,title,total_amount:total}).select().single();
     if(error||!bill){showToast('❌ ບັນທຶກບໍ່ສຳເລັດ');return;}
     const parts=[];
     rows.forEach(r=>{const n=r.querySelector('.name-input').value||'ໝູ່',a=parse(r.querySelector('.amount-input').value);if(a>0)parts.push({bill_id:bill.id,name:n,amount_owed:a,paid:false});});
@@ -619,18 +787,35 @@ function renderSplit() {
 
 // ── UI ────────────────────────────────────────────────────────────────
 function switchTab(tab) {
-    ['budget','ai','split'].forEach(t=>{
+    ['budget','goals','ai','split'].forEach(t=>{
         document.getElementById('page-'+t).classList.toggle('hidden',t!==tab);
         const b=document.getElementById('tab-'+t);
         b.className='flex-1 py-2.5 rounded-xl text-xs font-bold transition-all '+(t===tab?'tab-active':'tab-inactive');
     });
     document.getElementById('fab-budget').classList.toggle('hidden',tab!=='budget');
 }
-function updateCategories(){document.getElementById('category').innerHTML=categories[document.getElementById('type').value].map(c=>`<option value="${c}">${c}</option>`).join('');}
-function openAddModal(){document.getElementById('modalTitle').innerText='ບັນທຶກໃໝ່';document.getElementById('editId').value='';document.getElementById('desc').value='';document.getElementById('amountDisplay').value='';document.getElementById('deleteBtn').classList.add('hidden');updateCategories();document.getElementById('modal').classList.remove('hidden');}
-function openEditModal(id,desc,type,category,amount){document.getElementById('modalTitle').innerText='ແກ້ໄຂ';document.getElementById('editId').value=id;document.getElementById('desc').value=desc;document.getElementById('type').value=type;updateCategories();document.getElementById('category').value=category;document.getElementById('amountDisplay').value=fmt(amount);document.getElementById('deleteBtn').classList.remove('hidden');document.getElementById('modal').classList.remove('hidden');}
+function openAddModal() {
+    document.getElementById('modalTitle').innerText='ບັນທຶກໃໝ່';
+    document.getElementById('editId').value='';document.getElementById('desc').value='';document.getElementById('amountDisplay').value='';
+    document.getElementById('deleteBtn').classList.add('hidden');updateCategories();
+    document.getElementById('modal').classList.remove('hidden');
+}
+function openEditModal(id,desc,type,category,amount) {
+    document.getElementById('modalTitle').innerText='ແກ້ໄຂ';
+    document.getElementById('editId').value=id;document.getElementById('desc').value=desc;
+    document.getElementById('type').value=type;updateCategories();
+    document.getElementById('category').value=category;
+    document.getElementById('amountDisplay').value=fmt(amount);
+    document.getElementById('deleteBtn').classList.remove('hidden');
+    document.getElementById('modal').classList.remove('hidden');
+}
 function closeModal(){document.getElementById('modal').classList.add('hidden');}
-function openNewSplitModal(){document.getElementById('splitTitle').value='';document.getElementById('splitTotal').value='';document.getElementById('participantRows').innerHTML='';document.getElementById('splitSummary').classList.add('hidden');participantCount=0;addParticipantRow();addParticipantRow();document.getElementById('splitModal').classList.remove('hidden');}
+function openNewSplitModal(){
+    document.getElementById('splitTitle').value='';document.getElementById('splitTotal').value='';
+    document.getElementById('participantRows').innerHTML='';document.getElementById('splitSummary').classList.add('hidden');
+    participantCount=0;addParticipantRow();addParticipantRow();
+    document.getElementById('splitModal').classList.remove('hidden');
+}
 function closeSplitModal(){document.getElementById('splitModal').classList.add('hidden');}
 function openSummaryModal(){document.getElementById('summaryModal').classList.remove('hidden');renderChart();}
 function closeSummaryModal(){document.getElementById('summaryModal').classList.add('hidden');}
@@ -641,11 +826,6 @@ function renderChart(){
     if(!Object.keys(dm).length)return;
     chartInstance=new Chart(ctx,{type:'doughnut',data:{labels:Object.keys(dm),datasets:[{data:Object.values(dm),backgroundColor:['#3b82f6','#8b5cf6','#ec4899','#f43f5e','#f59e0b','#10b981','#64748b','#06b6d4','#84cc16'],borderWidth:0}]},options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{family:'Noto Sans Lao',size:11}}}}}});
 }
-
-// ── Init ──────────────────────────────────────────────────────────────
-setFilter('month');
-updateCategories();
-loadAll();
 </script>
 </body>
 </html>
