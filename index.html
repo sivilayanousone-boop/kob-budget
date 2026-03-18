@@ -611,16 +611,22 @@ function exportCSV() {
 
 // ── Gemini AI (fixed model) ───────────────────────────────────────────
 async function callGemini(prompt, system) {
-    const res = await fetch(GEMINI_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            systemInstruction: { parts: [{ text: system }] },
-            generationConfig: { maxOutputTokens: 1024, temperature: 0.7 }
-        })
-    });
-    if (!res.ok) throw new Error('HTTP '+res.status);
+    const res = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent',
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': GEMINI_KEY
+            },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: { parts: [{ text: system }] },
+                generationConfig: { maxOutputTokens: 1024, temperature: 0.7 }
+            })
+        }
+    );
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const d = await res.json();
     if (d.error) throw new Error(d.error.message);
     return d.candidates?.[0]?.content?.parts?.[0]?.text || 'AI ບໍ່ຕອບ';
